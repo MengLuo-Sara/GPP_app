@@ -13,7 +13,7 @@ library(mapproj)
 source("helpers.R")
 library(tidyverse)
 library(reshape2)
-GPP <- readRDS("D:/PHD/Course/STAT 433/project/GPP_app/GPP_app/data/GPP_data_all3.rds")
+GPP <- readRDS("data/GPP_data_all3.rds")
 
 #source("helpers.R")#help you make choropleth maps
 
