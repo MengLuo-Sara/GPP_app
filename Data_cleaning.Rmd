@@ -1,0 +1,183 @@
+---
+title: "project_data"
+author: "Meng Luo"
+date: "2021/11/14"
+output: html_document
+---
+
+```{r setup, include=F}
+
+```
+## Data
+A series of data preprocessing steps were used to acquire the monthly and yearly area-averaged GPP data over ABZ. 
+
+Firstly, used spatial masks of ABZ to clip and calculate the area-averaged GPP values for each data.
+
+Secondly, unified the GPP units of climate models and remote sensing products.
+
+Thirdly, filtered the GPP data from different data source to the overlapping time periods from 2003 to 2012.
+
+Fourthly, aggregated the monthly GPP to annual scales.
+
+Fifthly, the ensemble mean GPP values from four remote sensing products was calculated. Note that GISS in CMIP5 and UKESM in CMIP6 only covers 2006-2012. 
+
+## Code
+
+```{r read NC, include = T}
+#install.packages("raster")
+library(cowplot)
+library(raster)
+library(ncdf4)
+library(rasterVis)
+library(lattice)
+library(tidyverse)
+library(rgdal)
+library(Directional)
+library(dplyr)
+library(reshape2)
+
+
+
+
+##read Remote sensing GPP product#######################################################
+#lct <- Sys.getlocale("LC_TIME"); Sys.setlocale("LC_TIME", "C")
+## GPP unit: g m-2 d-1##################################################################
+RS_GPP = read.table("D:/Research/GCAM/Code/STAT_433/remotely_sensed_GPP.csv",header = TRUE, sep = ",")
+
+#RS_GPP1: MODIS,RS_GPP2:BESS, RS_GPP3:VPM, RS_GPP4:FLUXCOM
+
+RS_GPP_1 = RS_GPP %>% 
+  group_by(year,month)%>%
+  summarise(MODIS_mean = mean(RS_GPP1, na.rm=TRUE),BESS_mean = mean(RS_GPP2, na.rm=TRUE) , VPM_mean = mean(RS_GPP3, na.rm=TRUE) ,FLUXCOM_mean = mean(RS_GPP4, na.rm=TRUE)) %>%
+  mutate(year_month = year*100+month)
+# remove nan
+RS_GPP_1 = na.omit(RS_GPP_1)
+
+
+
+
+
+##read model GPP########################################################################
+## GPP unit kg m-2 s-1###############################################
+# CMIP5 ###############################################################################
+#######################################################################################
+#GPP data1#######################################################
+ncfile5_1<-nc_open("D:/PHD/Course/STAT 433/project/data/CMIP5/new/gpp_Lmon_GISS-E2-R_historicalExt_r6i1p1_200601-201212.nc")
+GISS5 = ncvar_get(ncfile5_1, varid='gpp', start=c(1,1,1), count=c(-1,-1,84), verbose=FALSE, signedbyte=TRUE, collapse_degen=TRUE)
+# GPP data2######################################################
+ncfile5_2<-nc_open("D:/PHD/Course/STAT 433/project/data/CMIP5/new/same model/gpp_Lmon_IPSL-CM5A-MR_historicalNat_r3i1p1_185001-201212.nc")
+IPSL5 = ncvar_get(ncfile5_2, varid='gpp', start=c(1,1,1801), count=c(-1,-1,156), verbose=FALSE, signedbyte=TRUE, collapse_degen=TRUE)
+# GPP data3######################################################
+ncfile5_3<-nc_open("D:/PHD/Course/STAT 433/project/data/CMIP5/new/same model/gpp_Lmon_CanESM2_historicalMisc_r1i1p2_185001-201212.nc")
+CanESM5 = ncvar_get(ncfile5_3, varid='gpp', start=c(1,1,1801), count=c(-1,-1,156), verbose=FALSE, signedbyte=TRUE, collapse_degen=TRUE)
+
+
+
+
+
+
+# CMIP6 ###############################################################################
+#######################################################################################
+#GPP data1###########################################################
+ncfile6_1<-nc_open("D:/PHD/Course/STAT 433/project/data/CMIP6/GPP/select/gpp_Lmon_UKESM1-0-LL_hist-piAer_r1i1p1f2_gn_195001-201412.nc")
+UKESM16 = ncvar_get(ncfile6_1, varid='gpp', start=c(1,1,601), count=c(-1,-1,180), verbose=FALSE, signedbyte=TRUE, collapse_degen=TRUE)
+# GPP data2###########################################################
+ncfile6_2<-nc_open("D:/PHD/Course/STAT 433/project/data/CMIP6/GPP/select/gpp_Lmon_IPSL-CM6A-LR_historical_r10i1p1f1_gr_185001-201412.nc")
+IPSL6 = ncvar_get(ncfile6_2, varid='gpp', start=c(1,1,1801), count=c(-1,-1,180), verbose=FALSE, signedbyte=TRUE, collapse_degen=TRUE)
+# GPP data3###########################################################
+ncfile6_3<-nc_open("D:/PHD/Course/STAT 433/project/data/CMIP6/GPP/select/gpp_Lmon_CanESM5_historical_r1i1p2f1_gn_185001-201412.nc")
+CanESM6 = ncvar_get(ncfile6_3, varid='gpp', start=c(1,1,1801), count=c(-1,-1,180), verbose=FALSE, signedbyte=TRUE, collapse_degen=TRUE)
+
+
+
+
+
+#ABOVE raster################################################################################################
+#ABoVE raster1#################################################
+ABoVE_raster1 <- raster(x = "D:/PHD/Course/STAT 433/project/data/ABoVe_region/above_domain2_192_144.tif")
+#plot(ABoVE_raster1)
+ABoVE_raster1 = (as.matrix(ABoVE_raster1))
+ABoVE_raster1 = t(apply(ABoVE_raster1, 2, rev))
+ABoVE_raster1[ABoVE_raster1 == 0] = NaN
+#ABoVE raster2#################################################
+ABoVE_raster2 <- raster(x = "D:/PHD/Course/STAT 433/project/data/ABoVe_region/above_domain2_143_144_360.tif")
+#plot(ABoVE_raster2)
+ABoVE_raster2 = (as.matrix(ABoVE_raster2))
+ABoVE_raster2 = t(apply(ABoVE_raster2, 2, rev))
+ABoVE_raster2[ABoVE_raster2 == 0] = NaN
+#ABoVE raster3#################################################
+ABoVE_raster3 <- raster(x = "D:/PHD/Course/STAT 433/project/data/ABoVe_region/above_domain2_64_128_360.tif")
+#plot(ABoVE_raster3)
+ABoVE_raster3 = (as.matrix(ABoVE_raster3))
+ABoVE_raster3 = t(apply(ABoVE_raster3, 2, rev))
+ABoVE_raster3[ABoVE_raster3 == 0] = NaN
+#ABoVE raster4#################################################
+ABoVE_raster4 <- raster(x = "D:/PHD/Course/STAT 433/project/data/ABoVe_region/above_domain2_90_144.tif")
+#plot(ABoVE_raster4)
+ABoVE_raster4 = (as.matrix(ABoVE_raster4))
+ABoVE_raster4 = t(apply(ABoVE_raster4, 2, rev))
+ABoVE_raster4[ABoVE_raster4 == 0] = NaN
+
+
+
+
+
+# calculate mean GPP####################################################################
+GISS_mean5 = rep(NaN, 180)
+IPSL_mean5 = rep(NaN, 180)
+CanESM_mean5 = rep(NaN, 180)
+
+UKESM1_mean6 = rep(NaN, 180)
+IPSL_mean6 = rep(NaN, 180)
+CanESM_mean6 = rep(NaN, 180)
+
+year = rep(NaN, 180)
+month = rep(NaN, 180)
+
+tran = 3600*24*1000
+
+for(time_i in 1:180)
+{
+  if (time_i%%12 == 0)
+  {year[time_i] = time_i%/%12 + 1999;
+
+   month[time_i] =  12;}
+  else
+   {year[time_i] = time_i%/%12 + 2000;
+
+   month[time_i] =  time_i%%12;
+   }
+# unit transform at the same time
+# unit: g m-2 d-1
+  
+  IPSL_mean6[time_i] = mean(ABoVE_raster2*IPSL6[,,time_i]*tran, na.rm = TRUE)
+  CanESM_mean6[time_i] = mean(ABoVE_raster3*CanESM6[,,time_i]*tran, na.rm = TRUE)
+  if(time_i<157)
+  {
+    IPSL_mean5[time_i] = mean(ABoVE_raster2*IPSL5[,,time_i]*tran, na.rm = TRUE)
+    CanESM_mean5[time_i] = mean(ABoVE_raster3*CanESM5[,,time_i]*tran, na.rm = TRUE)
+  }
+  if(time_i>72 & time_i<157)
+  {
+    GISS_mean5[time_i] = mean(ABoVE_raster4*GISS5[,,time_i-72]*tran, na.rm = TRUE)
+    UKESM1_mean6[time_i] = mean(ABoVE_raster1*UKESM16[,,time_i]*tran, na.rm = TRUE)
+    }
+}
+
+
+GPP_data<-data.frame(year,month,GISS_mean5,IPSL_mean5,CanESM_mean5,UKESM1_mean6,IPSL_mean6,CanESM_mean6)%>%
+  mutate(year_month = year*100+month)
+
+GPP_data_all= inner_join(GPP_data,RS_GPP_1)
+#MODIS,RS_GPP2:BESS, RS_GPP3:VPM, RS_GPP4:FLUXCOM
+GPP_data_all = GPP_data_all%>%
+  mutate(GPP_RS_mean = (MODIS_mean+BESS_mean+VPM_mean+FLUXCOM_mean)/4)%>%
+  filter(year<=2012)
+
+saveRDS(GPP_data_all, file = "D:/PHD/Course/STAT 433/project/GPP_app/GPP_data_all3.rds")
+
+
+```
+
+Figure. Monthly time series of GPP from (A) climate models and (B) remote sensing observations.
+
